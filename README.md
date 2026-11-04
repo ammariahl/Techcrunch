@@ -4,13 +4,15 @@
 
 **Ammaria Hellou**
 
-Technical Test - Data Engineer Apprenticeship Application - Liora
+Technical Test – Data Engineer Apprenticeship Application – Liora
 
 ## Description
 
 This project is an ETL pipeline developed as part of the Data Engineer apprenticeship technical test for Liora.
 
-The script retrieves articles from TechCrunch category pages, extracts their HTML content, transforms the data into a structured format, and loads the results into a MySQL database.
+The application retrieves articles from TechCrunch category pages, extracts their HTML content, transforms the data into a structured format, and loads the results into a MySQL database.
+
+The application is containerized using Docker and Docker Compose. The scraper and MySQL database run in separate containers and communicate through a dedicated Docker network.
 
 ## Features
 
@@ -30,31 +32,30 @@ The script retrieves articles from TechCrunch category pages, extracts their HTM
   - TechCrunch ID
 - Insert new articles into MySQL
 - Update existing articles based on their URL
+- Prevent duplicate articles using the URL as the primary key
 - Handle invalid category selections
 - Handle HTTP and network errors
 - Skip articles that cannot be retrieved or transformed
+- Run the application using Docker and Docker Compose
+- Persist database data using a Docker named volume
 
 ## ETL Pipeline
 
 The project follows a simple ETL architecture:
 
-Category selection
-↓
-Extract article URLs
-↓
-Extract article HTML
-↓
-Transform article data
-↓
-Load data into MySQL
+1. Category selection
+2. Extract article URLs
+3. Extract article HTML
+4. Transform article data
+5. Load data into MySQL
 
-- Extract
+### Extract
 
 The script retrieves the selected TechCrunch category page and extracts article URLs.
 
 It then retrieves the raw HTML content of each article.
 
-- Transform
+### Transform
 
 The HTML content is parsed using BeautifulSoup.
 
@@ -62,89 +63,134 @@ The script extracts the required metadata and transforms dates into Python `date
 
 It also extracts categories, tags, image URLs and the TechCrunch ID from the page's structured data.
 
-- Load
+### Load
 
 The transformed data is inserted into a MySQL database.
+
 The URL is used as the primary key.
+
 If an article with the same URL already exists, its information is updated instead of creating a duplicate.
 
 ## Technologies
 
-- Python 3
+- Python 3.12
 - Requests
 - BeautifulSoup
-- MySQL
+- MySQL 8.0
 - mysql-connector-python
+- Docker
+- Docker Compose
 - Regular expressions
 - JSON / JSON-LD
 
+## Project Architecture
+
+The application uses two Docker services:
+
+- **scraper**: Python application responsible for extracting, transforming and loading articles.
+- **mysql**: MySQL database responsible for storing article data.
+
+The two services communicate through the Docker Compose network. The scraper connects to MySQL using the service name `mysql`.
+
+Database data is persisted using a named Docker volume.
+
 ## Project Structure
 
+```text
 Techcrunch/
 │
-├── .venv/
+├── scraper/
+│   └── scraper.py
 │
+├── .dockerignore
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
+├── init.sql
 ├── requirements.txt
-│
-├── README.md
-│
-└── scraper/
-└── scraper.py
+└── README.md
+```
 
-## Installation
+## Prerequisites
 
-- Create and activate a Python virtual environment:
+- Docker Desktop
+- Docker Compose
+- Git
 
-python -m venv .venv
-.venv\Scripts\activate
+No local Python or MySQL installation is required when using Docker.
 
-- Install the required dependencies:
+## Installation and Configuration
 
-pip install -r requirements.txt
+### 1. Clone the repository
 
-- If the dependencies have to be installed manually:
+```bash
+git clone https://github.com/ammariahl/Techcrunch.git
+cd Techcrunch
+```
 
-pip install requests beautifulsoup4 mysql-connector-python
+### 2. Create the environment file
 
-## Database Setup
+Create a `.env` file in the project root directory:
 
-The project uses MySQL.
+```dotenv
+MYSQL_ROOT_PASSWORD=your_mysql_password
+```
 
-- Create the database:
-  CREATE DATABASE techcrunch;
+Replace `your_mysql_password` with a password of your choice.
 
-- Select the database:
-  USE techcrunch;
+**Important:** Never commit the `.env` file to Git. It is excluded through `.gitignore`.
 
-- Create the `articles` table:
-  CREATE TABLE articles (
-  url VARCHAR(700) PRIMARY KEY,
-  title VARCHAR(500),
-  description TEXT,
-  author VARCHAR(255),
-  publication_date DATETIME,
-  modified_date DATETIME,
-  image_url VARCHAR(700),
-  category TEXT,
-  tags TEXT,
-  techcrunch_id BIGINT
-  );
+### 3. Build and start MySQL
 
-## Usage
+```bash
+docker compose up -d --build mysql
+```
 
-- Activate the virtual environment:
-  .venv\Scripts\activate
+Docker Compose starts the MySQL service and waits for its health check.
 
-- Run the scraper:
-  python scraper\scraper.py
+On the first initialization of an empty database volume, `init.sql` automatically creates the `articles` table.
+
+### 4. Run the scraper
+
+```bash
+docker compose run --rm scraper
+```
 
 The script displays the available TechCrunch categories.
 
 Select a category by entering its corresponding number.
 
-The script then extracts, transforms and loads the articles into the MySQL database.
+The scraper then extracts, transforms and loads the articles into MySQL.
 
-The MySQL username and password are requested when the loading phase starts.
+### 5. Check running containers
+
+```bash
+docker compose ps
+```
+
+### 6. Check the number of stored articles
+
+```bash
+docker compose exec mysql mysql -uroot -p -D techcrunch -e "SELECT COUNT(*) FROM articles;"
+```
+
+Enter the MySQL root password when prompted.
+
+## Database
+
+The project uses MySQL 8.0.
+
+The database is named `techcrunch` and contains an `articles` table.
+
+The table is automatically created through `init.sql` when MySQL initializes an empty data volume.
+
+Database data is stored in the Docker named volume:
+
+```text
+techcrunch_mysql_data
+```
+
+This ensures that article data is preserved when containers are stopped or recreated.
 
 ## Error Handling
 
@@ -159,3 +205,15 @@ The scraper handles several potential issues:
 - Articles whose data cannot be transformed
 
 When an individual article cannot be processed, it is skipped and the scraper continues with the remaining articles.
+
+## Security
+
+- Database credentials are stored in a local `.env` file.
+- The `.env` file is excluded from Git using `.gitignore`.
+- The database is accessed by the scraper through the internal Docker network.
+
+## Notes
+
+The `init.sql` script is executed automatically only when MySQL initializes an empty data directory. It does not recreate or modify tables in an already initialized database volume.
+
+The scraper can be executed repeatedly. Existing articles are updated based on their URL rather than inserted as duplicates.
