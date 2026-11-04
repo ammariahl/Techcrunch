@@ -27,6 +27,7 @@ Project:
 
 
 # IMPORT
+import os
 import requests
 import json
 import re
@@ -315,15 +316,12 @@ def transform_article_data(html_content, url):
         None 
 """
 def load_articles(data):
-    user = input("MySQL user: ")
-    password = getpass.getpass("MySQL password: ")
-
     connection = mysql.connector.connect(
-        host="localhost",
-        user=user,
-        password=password,
-        database="techcrunch"
-    )
+    host=os.getenv("MYSQL_HOST"),
+    user=os.getenv("MYSQL_USER"),
+    password=os.getenv("MYSQL_PASSWORD"),
+    database=os.getenv("MYSQL_DATABASE")
+)
 
     cursor = connection.cursor()
     

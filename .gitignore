@@ -1,3 +1,11 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Variables d'environnement et secrets
+.env
+.env.*
+!.env.example
+
+# Sauvegardes de la base de données
+articles_backup.sql
